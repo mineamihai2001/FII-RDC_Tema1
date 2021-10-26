@@ -15,15 +15,15 @@
 #define FIFO_NAME "Comanda"
 #define FIFO_2_NAME "Raspuns"
 
-int is_logged;
+int is_logged = 0;
 time_t logged_time;
 char *time_str;
 
 int este_comanda(int fd, int fd2, char comanda[], char username[]);
 int login(char username[]);
 int get_logged_users(int fd, char username[], char buff[]);
-int get_proc_info(int ppid, char buff[]);
-int logout();
+int get_proc_info(int ppid, char buff[], char username[]);
+void logout();
 void quit();
 void fifo_write(int fd, char text[]);
 void fifo_read(int fd, int fd2, char text[], char username[]);
@@ -42,6 +42,8 @@ int main(int argc, char *argv[])
     printf("Client conectat\n");
 
     fifo_read(fd, fd2, comanda, username);
+    
+    return 0;
 }
 int este_comanda(int fd, int fd2, char comanda[], char username[])
 {
@@ -120,8 +122,11 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
                 ppid = ppid * 10 + (comanda[i] - '0');
             }
             printf("S-a dat comanda %s cu pid: %d\n", comanda, ppid);
-
-            get_proc_info(ppid, buff);
+            if(login(username) == 0)
+            {
+                
+            }
+            get_proc_info(ppid, buff, username);
 
             if (write(pfd[1], buff, 10000000) < 0)
             {
@@ -133,13 +138,15 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
         else if (strncmp(comanda, "logout", 5) == 0) //logout
         {
             printf("S-a dat comanda %s\n", comanda);
-            if (write(pfd[1], comanda, 1024) < 0)
+            strcpy(buff, "Disconnected");
+            logout();
+            is_logged = 0;
+            if (write(pfd[1], buff, 1024) < 0)
             {
                 printf("Eroare la scriere in pipe");
                 exit(2);
             }
             close(pfd[1]);
-            logout();
         }
         else if (strncmp(comanda, "quit", 4) == 0) //exit
         {
@@ -249,8 +256,15 @@ int get_logged_users(int fd, char username[], char buff[])
     buff[strlen(buff)] = '\0';
     return 1;
 }
-int get_proc_info(int ppid, char buff[])
+int get_proc_info(int ppid, char buff[], char username[])
 {
+    if (is_logged == 0)
+    {
+        printf("Niciun user logat %d!\n", is_logged);
+        strcpy(buff, "Niciun user logat!\n");
+        return 0;
+    }
+
     int gasit = 0;
     char line[100];
     char word[10] = "";
@@ -340,14 +354,44 @@ int get_proc_info(int ppid, char buff[])
     fclose(fd_stat);
     return 1;
 }
-int logout()
+void logout()
 {
+    is_logged = 0;
 }
 void quit()
 {
     is_logged = 0;
-    printf("S-a executat comanda quit\n");
-    exit(2);
+    int quit = 0;
+    int pid;
+    int sockp[2];
+    char msg[30] = "";
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockp) < 0)
+    {
+        printf("Eroare socketpair\n");
+        exit(0);
+    }
+    if ((pid = fork()) == -1)
+    {
+        printf("Eroare fork\n");
+        exit(0);
+    }
+    else if (pid == 0)
+    {
+        close(sockp[0]);
+        if (write(sockp[1], "Am iesit din porgram", sizeof("Am iesit din program")) < 0)
+            perror("Eroare la scriere in socket\n");
+        printf("[Copil] :  am transmis cu succes la parinte\n");
+        close(sockp[1]);
+    }
+    else
+    {
+        close(sockp[1]);
+        if (read(sockp[0], msg, 1024) < 0)
+            perror("Eroare la citire din socket\n");
+        printf("[Parinte]:  %s\n", msg);
+        close(sockp[1]);
+        exit(2);
+    }
 }
 
 void get_stats(char buff[])
