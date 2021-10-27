@@ -23,7 +23,7 @@ int este_comanda(int fd, int fd2, char comanda[], char username[]);
 int login(char username[]);
 int get_logged_users(int fd, char username[], char buff[]);
 int get_proc_info(int ppid, char buff[], char username[]);
-void logout();
+void logout(char username[]);
 void quit();
 void fifo_write(int fd, char text[]);
 void fifo_read(int fd, int fd2, char text[], char username[]);
@@ -139,7 +139,7 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
         {
             printf("S-a dat comanda %s\n", comanda);
             strcpy(buff, "Disconnected");
-            logout();
+            logout(username);
             is_logged = 0;
             if (write(pfd[1], buff, 1024) < 0)
             {
@@ -354,9 +354,10 @@ int get_proc_info(int ppid, char buff[], char username[])
     fclose(fd_stat);
     return 1;
 }
-void logout()
+void logout(char username[])
 {
     is_logged = 0;
+    strcpy(username, "");
 }
 void quit()
 {
