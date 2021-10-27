@@ -18,7 +18,6 @@ int main(int argc, char *argv[])
 
     char comanda[30], raspuns[100];
     int num, fd, fd2;
-    //mknod(FIFO_2_NAME, S_IFIFO | 0666, 0);
     printf("Asteptare server ...\n");
     fd = open(FIFO_NAME, O_WRONLY);
     fd2 = open(FIFO_2_NAME, O_RDONLY);
@@ -33,7 +32,6 @@ int main(int argc, char *argv[])
             exit(3);
         }
         fifo_read(fd2, raspuns);
-        // read(fd2, raspuns, 1024);
     }
 }
 
@@ -44,10 +42,6 @@ void fifo_write(int fd, char text[])
     {
         perror("Eroare la scriere in FIFO\n");
         exit(0);
-    }
-    else
-    {
-        //printf("S-a scris in FIFO: %s\n", text);
     }
 }
 
@@ -61,7 +55,6 @@ void fifo_read(int fd, char text[])
         else
         {
             text[num] = '\0';
-            // printf("S-a citit din FIFO2 comanda:\n%s\n", text);
             printf("%s\n\n", text);
             break;
         }

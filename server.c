@@ -19,7 +19,7 @@ int is_logged = 0;
 time_t logged_time;
 char *time_str;
 
-int este_comanda(int fd, int fd2, char comanda[], char username[]);
+void este_comanda(int fd, int fd2, char comanda[], char username[]);
 int login(char username[]);
 int get_logged_users(int fd, char username[], char buff[]);
 int get_proc_info(int ppid, char buff[], char username[]);
@@ -42,10 +42,10 @@ int main(int argc, char *argv[])
     printf("Client conectat\n");
 
     fifo_read(fd, fd2, comanda, username);
-    
+
     return 0;
 }
-int este_comanda(int fd, int fd2, char comanda[], char username[])
+void este_comanda(int fd, int fd2, char comanda[], char username[])
 {
     int pid, pfd[2];
     char buff[1000];
@@ -79,9 +79,16 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
             char raspuns[100];
 
             printf("S-a dat comanda login cu username:%s\n", username);
+            printf("Login : %d\n", login(username));
             if (login(username) == 0)
             {
                 printf("Username-ul nu exista: %s\n", username);
+                if (write(pfd[1], "Username-ul nu exista", 1024) < 0)
+                {
+                    printf("Eroare la scriere in pipe!\n");
+                    exit(1);
+                }
+                close(pfd[1]);
             }
             else
             {
@@ -100,11 +107,11 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
                 }
                 close(pfd[1]);
             }
-            //close(fd2);
         }
         else if (strncmp(comanda, "get-logged-users", 15) == 0) //get-logged-users
         {
             printf("S-a dat comanda %s, cu userame %s, %d\n", comanda, username, is_logged);
+
             get_logged_users(fd, username, buff);
             if (write(pfd[1], buff, 1024) < 0)
             {
@@ -122,10 +129,6 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
                 ppid = ppid * 10 + (comanda[i] - '0');
             }
             printf("S-a dat comanda %s cu pid: %d\n", comanda, ppid);
-            if(login(username) == 0)
-            {
-                
-            }
             get_proc_info(ppid, buff, username);
 
             if (write(pfd[1], buff, 10000000) < 0)
@@ -138,8 +141,9 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
         else if (strncmp(comanda, "logout", 5) == 0) //logout
         {
             printf("S-a dat comanda %s\n", comanda);
-            strcpy(buff, "Disconnected");
             logout(username);
+            strcpy(buff, "Disconnected");
+            strcat(buff, username);
             is_logged = 0;
             if (write(pfd[1], buff, 1024) < 0)
             {
@@ -181,7 +185,8 @@ int este_comanda(int fd, int fd2, char comanda[], char username[])
         time_str[strlen(time_str) - 1] = '\0';
 
         char buff[100000];
-        printf("Am intrat in parinte %s\n", username);
+        printf("Am intrat in parinte %s, %d\n", username, is_logged);
+
         close(pfd[1]);
         if (read(pfd[0], buff, sizeof(buff)) < 0)
         {
@@ -213,9 +218,10 @@ int login(char username[])
     users = fopen("users.txt", "r");
     while (fgets(name, sizeof(name), users) != NULL)
     {
-        if (strstr(name, username) == 0)
+        if (strstr(name, username) != NULL)
         {
-            is_logged = 1;
+            printf("user gasit : %s\n", name);
+            //is_logged = 1;
             return 1;
         }
     }
@@ -225,7 +231,7 @@ int login(char username[])
 
 int get_logged_users(int fd, char username[], char buff[])
 {
-    if (is_logged == 0)
+    if (is_logged == 0 || login(username) == 0)
     {
         printf("Niciun user logat %d!\n", is_logged);
         strcpy(buff, "Niciun user logat!\n");
@@ -258,7 +264,7 @@ int get_logged_users(int fd, char username[], char buff[])
 }
 int get_proc_info(int ppid, char buff[], char username[])
 {
-    if (is_logged == 0)
+    if (is_logged == 0 || login(username) == 0)
     {
         printf("Niciun user logat %d!\n", is_logged);
         strcpy(buff, "Niciun user logat!\n");
@@ -326,10 +332,8 @@ int get_proc_info(int ppid, char buff[], char username[])
         }
     }
     closedir(folder);
-    // return 1;
 
     strcat(path, "/stat");
-    // path[strlen(path) - 1] = '\0';
 
     FILE *fd_stat;
     fd_stat = fopen(path, "r");
